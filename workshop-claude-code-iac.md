@@ -583,21 +583,21 @@ claude "infra/ 디렉토리에 컨테이너 워크로드 기반 인프라 Terraf
 infra/
 ├── modules/
 │   ├── vpc/
-│   │   ├── main.tf
-│   │   ├── endpoints.tf
-│   │   ├── variables.tf
-│   │   └── outputs.tf
+│   │   ├── main.tf           # VPC, 서브넷, IGW, NAT GW, 라우트 테이블
+│   │   ├── endpoints.tf      # VPC 엔드포인트 (ECR, S3, CloudWatch Logs)
+│   │   ├── variables.tf      # 입력 변수 (CIDR, AZ 등)
+│   │   └── outputs.tf        # 출력 값 (vpc_id, subnet_ids 등)
 │   └── ecs-cluster/
-│       ├── main.tf
-│       ├── variables.tf
-│       └── outputs.tf
+│       ├── main.tf           # ECS Cluster, Fargate 용량 공급자
+│       ├── variables.tf      # 입력 변수
+│       └── outputs.tf        # 출력 값 (cluster_id, cluster_name)
 ├── environments/
 │   └── dev/
-│       ├── main.tf
-│       ├── variables.tf
-│       ├── outputs.tf
-│       ├── terraform.tfvars
-│       └── providers.tf
+│       ├── main.tf           # 모듈 호출 (VPC, ECS Cluster)
+│       ├── variables.tf      # 환경별 변수 정의
+│       ├── outputs.tf        # app 템플릿이 참조할 출력 값
+│       ├── terraform.tfvars  # 환경별 변수 값 (리전, CIDR 등)
+│       └── providers.tf      # AWS provider 및 backend 설정
 └── README.md
 ```
 
@@ -1905,8 +1905,8 @@ curl http://$ALB_DNS/dogs
 ```
 
 > **Challenge:** 배포 이후에 강아지 사진이 나오는 dogs 서비스, 고양이 사진이 나오는 cats 서비스 화면을 스크린샷을 찍어서 게시판에 올려주세요.
-
-강사가 업로드할 게시판을 알려줄 것입니다. 그곳으로 올려주세요.
+>
+> 강사가 업로드할 게시판을 알려줄 것입니다. 그곳으로 올려주세요.
 
 ### 7.12 Auto Scaling 동작 테스트
 
