@@ -1,0 +1,11 @@
+# 모든 파일 제외
+*
+
+# 포함할 파일만 허용
+!.gitignore
+!README.md
+!workshop-claude-code-iac.md
+!assets/
+!assets/architecture.png
+!assets/app-architecture.png
+!assets/kiro-color.png
