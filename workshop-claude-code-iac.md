@@ -130,6 +130,23 @@ Terraform은 환경 변수에 설정된 AWS 자격 증명을 자동으로 인식
 
 이 워크샵에서는 워크샵 환경에서 제공하는 Amazon Bedrock 기반의 Claude 모델을 사용합니다.
 
+> [!IMPORTANT]
+> **Bedrock Claude 모델 접근을 위한 사전 작업**
+>
+> Claude LLM을 사용하기 위해서 Bedrock 관리 콘솔에서 **Submit use case details for Anthropic**을 진행해야 합니다.
+>
+> 1. 강사로부터 전달받은 주소와 인증 정보로 AWS 관리 콘솔로 접속합니다.
+> 2. **Bedrock** 서비스로 가서 **Tune → Marketplace model deployments**를 클릭합니다.
+> 3. 오른쪽에 **View marketplace models**를 클릭합니다.
+> 4. 위에 *"Anthropic requires first-time customers to submit use case details"*로 시작하는 안내가 있습니다. **Submit use case detail**을 클릭합니다.
+> 5. 아래와 같이 입력합니다:
+>    - **Company name**: `AWS`
+>    - **Company website URL**: `https://aws.amazon.com`
+>    - **What industry do you operate in?**: `Software as a Service`
+>    - **External users** 체크
+>    - **Describe**: `AWS training for customer` 입력
+> 6. 최종 **Submit use case details**를 클릭하여 제출합니다.
+
 ### 3.1 환경 변수 설정
 
 Claude Code가 Amazon Bedrock을 통해 모델을 호출하도록 설정합니다. Claude Code의 설정 파일(`~/.claude/settings.json`)을 아래 내용으로 교체합니다.
@@ -1894,8 +1911,8 @@ terraform apply
 ### 7.11 배포 확인
 
 ```bash
-# 인프라 출력에서 ALB DNS 확인
-cd ../../infra/environments/dev
+# 앱 출력에서 ALB DNS 확인
+cd ~/workshop-iac/app/environments/dev
 ALB_DNS=$(terraform output -raw alb_dns_name)
 
 # 각 서비스 경로 접근 테스트
