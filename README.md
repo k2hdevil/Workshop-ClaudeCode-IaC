@@ -67,8 +67,12 @@ AI 에이전틱 코딩 도구인 Claude Code와 Amazon Bedrock을 활용하여, 
 
 ---
 
+## 라이선스
+
+이 워크샵 교재는 [MIT License](LICENSE)로 배포됩니다. 자유롭게 사용, 수정, 재배포할 수 있습니다.
+
+---
+
 ## 제작 도구
 
-<img src="assets/kiro-color.png" alt="Kiro" width="120" />
-
-본 워크샵 교재는 [Kiro](https://kiro.dev)로 작성되었으며, HITL(Human-in-the-Loop) 방식으로 검증되었습니다.
+본 워크샵 교재는 <img src="assets/kiro-color.png" alt="Kiro" width="20" style="vertical-align: middle;" /> [Kiro](https://kiro.dev)로 작성되었으며, HITL(Human-in-the-Loop) 방식으로 검증되었습니다.
