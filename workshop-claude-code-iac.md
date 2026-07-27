@@ -13,7 +13,7 @@
 3. [Bedrock LLM 사용 설정](#3-bedrock-llm-사용-설정)
 4. [SKILL.md 생성 — AWS + Terraform + Container](#4-skillmd-생성--aws--terraform--container)
 5. [MCP 서버 연결 구성](#5-mcp-서버-연결-구성)
-6. [인프라 Terraform 템플릿 생성 및 배포](#6-인프라-terraform-템플릿-생성-및-배포) — VPC, ALB, ECS Cluster
+6. [인프라 Terraform 템플릿 생성 및 배포](#6-인프라-terraform-템플릿-생성-및-배포) — VPC, ECS Cluster
 7. [Container 기반 애플리케이션 배포를 위한 Terraform 템플릿 생성 및 배포](#7-container-기반-애플리케이션-배포를-위한-terraform-템플릿-생성-및-배포) — Cats & Dogs 멀티 서비스
 8. [비용 최적화 및 아키텍처 개선](#8-비용-최적화-및-아키텍처-개선)
 
@@ -157,9 +157,9 @@ Claude Code가 Amazon Bedrock을 통해 모델을 호출하도록 설정합니�
   "env": {
     "CLAUDE_CODE_USE_BEDROCK": "1",
     "AWS_REGION": "us-east-1",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "us.anthropic.claude-sonnet-4-6",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "us.anthropic.claude-opus-4-6-v1",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "global.anthropic.claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "global.anthropic.claude-opus-4-6-v1",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
   }
 }
 ```
@@ -175,7 +175,7 @@ Claude Code가 Amazon Bedrock을 통해 모델을 호출하도록 설정합니�
 | `ANTHROPIC_DEFAULT_OPUS_MODEL` | 고수준 계획 수립에 사용할 Opus 모델 ID |
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | 간단한 작업에 사용할 경량 Haiku 모델 ID |
 
-> **참고:** `global.` 접두사가 붙은 모델 ID는 Amazon Bedrock의 크로스 리전 추론을 사용합니다. 단일 리전에서만 호출하려면 `us.anthropic.claude-sonnet-4-6`처럼 리전 접두사를 사용합니다. 워크샵 진행자의 안내에 따라 모델 ID를 조정해주세요.
+> **참고:** `global.` 접두사가 붙은 모델 ID는 Amazon Bedrock의 크로스 리전 추론을 사용합니다. 특정 리전에 용량이 부족할 경우 다른 리전으로 자동 라우팅되어 가용성이 높아집니다. 단일 리전에서만 호출하려면 `us.anthropic.claude-sonnet-4-6`처럼 리전 접두사를 사용합니다.
 
 ### 3.2 Claude Code 최초 실행 — 로그인 우회
 
@@ -513,6 +513,40 @@ MCP 서버가 정상적으로 연결되어 있으면, Claude Code가 Terraform R
 > **왜 분리하는가?**  
 > HashiCorp는 Terraform 상태 파일의 관리 범위를 가능한 한 작게 유지할 것을 권장합니다. 하나의 상태 파일에 모든 리소스를 넣으면, 단일 리소스 변경이 전체 인프라에 영향을 줄 수 있기 때문입니다.  
 > 참고: [HashiCorp Workspace Best Practices](https://developer.hashicorp.com/terraform/enterprise/workspaces/best-practices)
+
+### Terraform 파일 역할 설명
+
+Terraform은 관례적으로 기능별로 `.tf` 파일을 분리합니다. 각 파일의 역할은 다음과 같습니다.
+
+| 파일명 | 역할 | 설명 |
+|--------|------|------|
+| `main.tf` | 리소스 정의 | 실제 AWS 리소스를 선언하는 핵심 파일 |
+| `variables.tf` | 입력 변수 선언 | 모듈 외부에서 주입받을 파라미터를 정의 |
+| `outputs.tf` | 출력 값 선언 | 다른 모듈이나 상태 파일에서 참조할 값을 내보냄 |
+| `providers.tf` | 프로바이더 설정 | AWS provider 버전, 리전, backend 설정 |
+| `terraform.tfvars` | 변수 값 할당 | `variables.tf`에 정의된 변수에 실제 값을 대입 |
+| `endpoints.tf` | VPC 엔드포인트 | (VPC 모듈 전용) 프라이빗 서비스 연결 정의 |
+
+> **핵심 원칙:** Terraform은 디렉토리 내 모든 `.tf` 파일을 자동으로 병합하여 하나의 구성으로 처리합니다. 파일 분리는 순전히 가독성과 유지보수를 위한 것이며, 기능적 차이는 없습니다.
+
+### 모듈(modules)과 환경(environments) 분리 패턴
+
+```
+infra/
+├── modules/          ← 재사용 가능한 "설계도" (무엇을 만들 것인가)
+│   ├── vpc/
+│   └── ecs-cluster/
+└── environments/     ← 환경별 "실행 구성" (어떤 값으로 만들 것인가)
+    └── dev/
+```
+
+- **modules/** — 리소스의 구조를 정의합니다. 변수로 파라미터화되어 있어 여러 환경에서 재사용 가능합니다.
+- **environments/** — 특정 환경(dev, staging, prod)에 맞는 구체적인 값을 넣어 모듈을 호출합니다.
+
+이 패턴의 장점:
+- 동일 모듈로 `dev`, `staging`, `prod` 환경을 각각 독립 배포 가능
+- 모듈 수정 시 모든 환경에 일관되게 반영
+- 환경별 상태 파일이 분리되어 blast radius 최소화
 
 ### 6.1 전체 프로젝트 구조
 
@@ -1871,7 +1905,7 @@ output "web_service_name" {
 }
 
 output "alb_dns_name" {
-  value = data.terraform_remote_state.infra.outputs.alb_dns_name
+  value = module.alb.alb_dns_name
 }
 ```
 
