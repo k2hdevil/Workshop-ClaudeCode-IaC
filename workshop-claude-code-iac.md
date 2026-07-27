@@ -4,6 +4,19 @@
 > **대상:** AWS 경험이 있는 초중급 엔지니어  
 > **목표:** Claude Code와 Amazon Bedrock을 활용하여 Terraform 기반의 컨테이너 인프라를 설계, 배포, 최적화하는 방법을 학습합니다.
 
+> [!NOTE]
+> **리전 변경 안내 (Oregon 리전에서 실습하는 경우)**
+>
+> 이 워크샵은 **us-east-1 (N. Virginia)** 기준으로 작성되어 있습니다. **us-west-2 (Oregon)** 리전에서 실습하려면 아래 항목을 모두 `us-west-2`로 변경하세요:
+>
+> - 섹션 2.1: `export AWS_REGION="us-west-2"`
+> - 섹션 3.1: settings.json의 `"AWS_REGION": "us-west-2"`
+> - 섹션 6.8: terraform.tfvars의 `aws_region = "us-west-2"`, `availability_zones = ["us-west-2a", "us-west-2b"]`
+> - 섹션 7.2: ECR 명령어의 `--region us-west-2` 및 ECR URI의 `.ecr.us-west-2.amazonaws.com`
+> - 섹션 7.7: app terraform.tfvars의 `aws_region = "us-west-2"`
+>
+> 모델 ID(`global.anthropic.claude-*`)는 크로스 리전 추론을 사용하므로 변경 불필요합니다.
+
 ---
 
 ## 목차
