@@ -73,8 +73,11 @@ Claude Code는 Anthropic이 개발한 **에이전틱(agentic) 코딩 도구**입
 | 항목 | 요구 사항 |
 |------|-----------|
 | Node.js | 18 이상 |
-| 운영체제 | macOS, Linux, 또는 Windows(WSL) |
+| 운영체제 | macOS, Linux, 또는 Windows(WSL2) |
 | 터미널 | bash 또는 zsh |
+
+> **Windows 사용자:** WSL2가 설치되어 있어야 합니다. 모든 명령은 WSL2 터미널 내에서 실행합니다.  
+> 설치 가이드: https://learn.microsoft.com/ko-kr/windows/wsl/install
 
 ### 1.3 설치
 
@@ -144,11 +147,13 @@ Terraform은 환경 변수에 설정된 AWS 자격 증명을 자동으로 인식
 이 워크샵에서는 워크샵 환경에서 제공하는 Amazon Bedrock 기반의 Claude 모델을 사용합니다.
 
 > [!IMPORTANT]
-> **Bedrock Claude 모델 접근을 위한 사전 작업**
+> **Bedrock Claude 모델 접근을 위한 사전 작업 (자체 AWS 계정을 사용하는 경우에만)**
 >
-> Claude LLM을 사용하기 위해서 Bedrock 관리 콘솔에서 **Submit use case details for Anthropic**을 진행해야 합니다.
+> AWS Workshop Studio를 통해 제공된 계정을 사용하는 경우, 모델 접근 권한이 이미 설정되어 있으므로 이 단계를 건너뛰세요.
 >
-> 1. 강사로부터 전달받은 주소와 인증 정보로 AWS 관리 콘솔로 접속합니다.
+> 자체 AWS 계정으로 실습하는 경우, Bedrock 관리 콘솔에서 **Submit use case details for Anthropic**을 진행해야 합니다.
+>
+> 1. AWS 관리 콘솔에 접속합니다.
 > 2. **Bedrock** 서비스로 가서 **Tune → Marketplace model deployments**를 클릭합니다.
 > 3. 오른쪽에 **View marketplace models**를 클릭합니다.
 > 4. 위에 *"Anthropic requires first-time customers to submit use case details"*로 시작하는 안내가 있습니다. **Submit use case detail**을 클릭합니다.
@@ -483,7 +488,7 @@ claude mcp add aws-ecs -- uvx --from awslabs.ecs-mcp-server ecs-mcp-server
 
 > **사전 요구:** AWS MCP 서버는 Python 패키지(PyPI)로 배포됩니다. `uvx`가 필요하며, 설치는 `curl -LsSf https://astral.sh/uv/install.sh | sh`로 할 수 있습니다.
 
-### 5.4 AWS Documentation MCP 서버 구성 (선택)
+### 5.4 AWS Documentation MCP 서버 구성
 
 AWS 공식 문서를 검색하고 참조할 수 있는 MCP 서버입니다.
 
