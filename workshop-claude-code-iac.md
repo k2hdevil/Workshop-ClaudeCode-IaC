@@ -5,15 +5,15 @@
 > **목표:** Claude Code와 Amazon Bedrock을 활용하여 Terraform 기반의 컨테이너 인프라를 설계, 배포, 최적화하는 방법을 학습합니다.
 
 > [!NOTE]
-> **리전 변경 안내 (Oregon 리전에서 실습하는 경우)**
+> **리전 변경 안내 (N. Virginia 리전에서 실습하는 경우)**
 >
-> 이 워크샵은 **us-east-1 (N. Virginia)** 기준으로 작성되어 있습니다. **us-west-2 (Oregon)** 리전에서 실습하려면 아래 항목을 모두 `us-west-2`로 변경하세요:
+> 이 워크샵은 **us-west-2 (Oregon)** 기준으로 작성되어 있습니다. **us-east-1 (N. Virginia)** 리전에서 실습하려면 아래 항목을 모두 `us-east-1`로 변경하세요:
 >
-> - 섹션 2.1: `export AWS_REGION="us-west-2"`
-> - 섹션 3.1: settings.json의 `"AWS_REGION": "us-west-2"`
-> - 섹션 6.8: terraform.tfvars의 `aws_region = "us-west-2"`, `availability_zones = ["us-west-2a", "us-west-2b"]`
-> - 섹션 7.2: ECR 명령어의 `--region us-west-2` 및 ECR URI의 `.ecr.us-west-2.amazonaws.com`
-> - 섹션 7.7: app terraform.tfvars의 `aws_region = "us-west-2"`
+> - 섹션 2.1: `export AWS_REGION="us-east-1"`
+> - 섹션 3.1: settings.json의 `"AWS_REGION": "us-east-1"`
+> - 섹션 6.9: terraform.tfvars의 `aws_region = "us-east-1"`, `availability_zones = ["us-east-1a", "us-east-1b"]`
+> - 섹션 7.2: ECR 명령어의 `--region us-east-1` 및 ECR URI의 `.ecr.us-east-1.amazonaws.com`
+> - 섹션 7.7: app terraform.tfvars의 `aws_region = "us-east-1"`
 >
 > 모델 ID(`global.anthropic.claude-*`)는 크로스 리전 추론을 사용하므로 변경 불필요합니다.
 
@@ -117,7 +117,7 @@ claude
 export AWS_ACCESS_KEY_ID="<워크샵에서 제공된 값>"
 export AWS_SECRET_ACCESS_KEY="<워크샵에서 제공된 값>"
 export AWS_SESSION_TOKEN="<워크샵에서 제공된 값>"
-export AWS_REGION="us-east-1"
+export AWS_REGION="us-west-2"
 ```
 
 ### 2.2 인증 확인
@@ -174,7 +174,7 @@ Claude Code가 Amazon Bedrock을 통해 모델을 호출하도록 설정합니�
   "model": "opusplan",
   "env": {
     "CLAUDE_CODE_USE_BEDROCK": "1",
-    "AWS_REGION": "us-east-1",
+    "AWS_REGION": "us-west-2",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "global.anthropic.claude-sonnet-4-6",
     "ANTHROPIC_DEFAULT_OPUS_MODEL": "global.anthropic.claude-opus-4-6-v1",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
@@ -221,14 +221,14 @@ Claude Code 대화형 모드에서 `/status` 명령어를 실행하여 Bedrock �
 | 확인 항목 | 기대 값 |
 |-----------|---------|
 | API Provider | `Amazon Bedrock` |
-| AWS Region | `us-east-1` (설정과 일치) |
+| AWS Region | `us-west-2` (설정과 일치) |
 | Model | `opusplan` 또는 설정한 모델명 |
 
 출력 예시:
 
 ```
 API Provider: Amazon Bedrock
-Region: us-east-1
+Region: us-west-2
 Model: opusplan
 ...
 ```
@@ -444,13 +444,13 @@ AI 모델은 학습 데이터 시점까지의 정보만 알고 있습니다. 하
 
 HashiCorp과 AWS Labs에서 제공하는 공식 MCP 서버는 단순한 문서 검색을 넘어, 해당 플랫폼에 특화된 도구와 워크플로우를 제공합니다.
 
-**HashiCorp Terraform MCP Server:**
+**Terraform MCP Server:**
 - Terraform Registry의 프로바이더/모듈 문서를 실시간 조회
 - 리소스별 인자(argument), 속성(attribute) 정보를 최신 상태로 제공
 - 프라이빗 모듈 레지스트리 연동 지원
 - 모델이 추측하지 않고 **공식 스키마에 기반한 정확한 코드**를 생성
 
-> 출처: [Terraform MCP Server — HashiCorp](https://github.com/hashicorp/terraform-mcp-server)
+> 이 워크샵의 5.2절에서는 두 가지 방식을 안내합니다: npx로 실행하는 [서드파티 구현체](https://github.com/thrashr888/terraform-mcp-server)와, HashiCorp이 배포하는 [공식 컨테이너 이미지](https://github.com/hashicorp/terraform-mcp-server). 기능은 동일하나 유지보수 주체가 다릅니다.
 
 **AWS Labs MCP Servers:**
 - ECS 서비스의 전체 라이프사이클(컨테이너화, 배포, 트러블슈팅) 지원
@@ -466,27 +466,54 @@ HashiCorp과 AWS Labs에서 제공하는 공식 MCP 서버는 단순한 문서 �
 
 Terraform Registry API와 연동되는 MCP Server를 연결합니다. 이 서버는 프로바이더 문서, 리소스 상세 정보, 모듈 메타데이터를 실시간으로 제공합니다.
 
-> 출처: https://github.com/hashicorp/terraform-mcp-server
-
 ```bash
-# Claude Code에 Terraform MCP 서버 추가
+# Claude Code에 Terraform MCP 서버 추가 (npx, 서드파티 패키지)
 claude mcp add terraform-registry -- npx -y terraform-mcp-server
 ```
 
-> **참고:** npm 패키지 이름은 `terraform-mcp-server`입니다 (`@hashicorp/` 스코프가 아님). 연결 실패 시 `npx -y terraform-mcp-server`를 직접 실행하여 에러 메시지를 확인하세요.
+> **참고:** 이 npm 패키지(`terraform-mcp-server`)는 HashiCorp 공식이 아니라 개인 개발자([thrashr888](https://github.com/thrashr888/terraform-mcp-server))가 만든 서드파티 프로젝트입니다. 기능은 동일하게 Terraform Registry 문서를 제공하지만 HashiCorp이 유지보수하지 않는다는 점을 감안하세요. 연결 실패 시 `npx -y terraform-mcp-server`를 직접 실행하여 에러 메시지를 확인하세요.
+
+**HashiCorp 공식: podman/Docker 컨테이너로 실행**
+
+HashiCorp이 공식 컨테이너 이미지를 배포합니다([hashicorp/terraform-mcp-server](https://github.com/hashicorp/terraform-mcp-server)). 진짜 공식 서버를 쓰고 싶다면 npx 대신 podman(또는 docker)으로 실행하세요.
+
+```bash
+# podman이 없다면 먼저 설치 (macOS 기준)
+brew install podman
+podman machine init
+podman machine start
+
+# Claude Code에 Terraform MCP 서버 추가 (podman)
+claude mcp add --scope user terraform -- podman run -i --rm hashicorp/terraform-mcp-server:1.3
+```
+
+> **참고:** Docker Desktop을 사용한다면 위 명령어의 `podman`을 `docker`로 바꾸면 동일하게 동작합니다.
+
+> **참고:** 이미지 태그는 [Docker Hub](https://hub.docker.com/r/hashicorp/terraform-mcp-server/tags)에서 확인하세요. 존재하지 않는 태그(예: `1.1.1`)를 지정하면 `manifest unknown` 에러로 연결에 실패합니다.
+
+> **참고:** podman/docker를 설치하기 어렵다면 위의 npx 방식을 사용하세요. 컨테이너 런타임 없이 동일한 기능을 제공합니다.
 
 ### 5.3 AWS ECS MCP 서버 구성
 
-AWS Labs에서 제공하는 ECS MCP Server를 연결합니다. 이 서버는 컨테이너 애플리케이션의 배포, 트러블슈팅, 리소스 관리를 지원합니다.
+Amazon ECS MCP Server를 연결합니다. 이 서버는 ECS 클러스터/서비스 상태 조회, 배포 모니터링, 컨테이너 트러블슈팅을 지원합니다.
 
-> 출처: https://awslabs.github.io/mcp/servers/ecs-mcp-server
+Amazon ECS MCP 서버는 AWS가 관리하는 **원격 엔드포인트**(`https://ecs-mcp.{region}.api.aws/mcp`)로 제공되며, `mcp-proxy-for-aws`가 로컬 AWS 자격 증명으로 SigV4 인증을 처리하는 클라이언트 브리지 역할을 합니다.
+
+> 출처: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-mcp-getting-started.html
 
 ```bash
-# Claude Code에 AWS ECS MCP 서버 추가
-claude mcp add aws-ecs -- uvx --from awslabs.ecs-mcp-server ecs-mcp-server
+# Claude Code에 Amazon ECS MCP 서버 추가 (관리형 원격 엔드포인트 + MCP Proxy)
+claude mcp add aws-ecs -- \
+  uvx mcp-proxy-for-aws@latest \
+  https://ecs-mcp.us-west-2.api.aws/mcp \
+  --service ecs-mcp \
+  --region us-west-2
 ```
 
-> **사전 요구:** AWS MCP 서버는 Python 패키지(PyPI)로 배포됩니다. `uvx`가 필요하며, 설치는 `curl -LsSf https://astral.sh/uv/install.sh | sh`로 할 수 있습니다.
+> [!NOTE]
+> - Amazon ECS MCP 서버는 **프리뷰(preview)** 단계이며 사양이 변경될 수 있습니다.
+> - 이 서버는 **읽기 전용(read-only)** 도구를 제공하며, 호출하는 자격 증명에 `ecs-mcp:UseMcp`, `ecs-mcp:InvokeReadOnlyTools` 및 ECS/CloudWatch Logs/ELB 등에 대한 읽기 권한(예: AWS 관리형 정책 `ReadOnlyAccess`)이 필요합니다. 워크샵 제공 자격 증명에 이 권한이 없으면 이 단계는 건너뛰어도 실습 진행에는 지장이 없습니다.
+> - `uvx`가 필요합니다. 설치: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ### 5.4 AWS Documentation MCP 서버 구성
 
@@ -511,7 +538,7 @@ claude mcp list
 ```
 terraform-registry: npx -y terraform-mcp-server - ✔ Connected
 aws-docs: uvx awslabs.aws-documentation-mcp-server - ✔ Connected
-aws-ecs: uvx --from awslabs.ecs-mcp-server ecs-mcp-server - ✔ Connected
+aws-ecs: uvx mcp-proxy-for-aws@latest https://ecs-mcp.us-west-2.api.aws/mcp ... - ✔ Connected
 ```
 
 ### 5.6 MCP 서버 동작 테스트
@@ -527,6 +554,34 @@ MCP 서버가 정상적으로 연결되어 있으면, Claude Code가 Terraform R
 ## 6. 인프라 Terraform 템플릿 생성 및 배포
 
 이 섹션에서는 컨테이너 워크로드의 **기반 인프라**(VPC, ECS Cluster)를 프로비저닝합니다. 애플리케이션 서비스와 분리하여 관리함으로써 상태 파일의 blast radius를 줄이고, 인프라 변경 없이 앱을 독립적으로 배포할 수 있습니다.
+
+### 6.1 Terraform이란? — 코드형 인프라(IaC)와 핵심 개념
+
+**Terraform**은 HashiCorp이 개발한 오픈소스 **코드형 인프라(Infrastructure as Code, IaC)** 도구입니다. AWS 콘솔에서 클릭으로 리소스를 만드는 대신, 원하는 인프라의 **최종 상태(desired state)**를 코드(HCL)로 선언하면 Terraform이 현재 상태와 비교해 필요한 API 호출을 계산하고 실행합니다.
+
+> 출처: [What is Terraform? — HashiCorp](https://developer.hashicorp.com/terraform/intro)
+
+#### 왜 코드형 인프라(IaC)인가?
+
+| 항목 | 콘솔/CLI로 수동 구성 | Terraform(IaC) |
+|------|----------------------|-----------------|
+| 재현성 | 담당자의 기억과 클릭 순서에 의존 | 코드 실행으로 동일 환경을 항상 동일하게 재생성 |
+| 버전 관리 | 변경 이력 추적 불가 | Git으로 diff, 리뷰, 롤백 가능 |
+| 검증 | 적용 후에야 결과 확인 | `plan`으로 적용 전에 변경 내용 미리 검토 |
+| 협업 | 누가 무엇을 바꿨는지 알기 어려움 | PR 기반 리뷰, 코드가 곧 문서 |
+| 확장 | 환경마다 반복 작업 | 모듈 재사용으로 dev/staging/prod 동일 구조 배포 |
+
+#### 핵심 개념
+
+- **Provider(프로바이더)** — Terraform이 특정 플랫폼(AWS, GCP, Azure 등)의 API와 통신하는 방법을 정의한 플러그인. 이 워크샵에서는 `aws` 프로바이더를 사용합니다.
+- **Resource(리소스)** — 실제로 생성/관리할 인프라 객체(예: `aws_vpc`, `aws_ecs_cluster`) 하나하나를 선언하는 블록.
+- **State(상태 파일)** — Terraform이 "지금 실제로 무엇이 배포되어 있는지"를 기록하는 파일(`terraform.tfstate`). 코드(desired state)와 상태 파일(current state)을 비교해 변경 계획을 세웁니다.
+- **Plan / Apply** — `terraform plan`은 코드와 상태를 비교해 **무엇이 바뀔지 미리 보여주는** 단계(읽기 전용, 안전), `terraform apply`는 그 계획을 **실제로 실행**하는 단계입니다.
+- **HCL(HashiCorp Configuration Language)** — Terraform 코드를 작성하는 선언형(declarative) 언어. "어떻게 만들지"가 아니라 "무엇이 있어야 하는지"를 기술합니다.
+- **Module(모듈)** — 여러 리소스를 하나의 재사용 가능한 단위로 묶은 것. 아래 "모듈과 환경 분리 패턴"에서 자세히 다룹니다.
+- **Idempotency(멱등성)** — 동일한 코드로 여러 번 `apply`해도 결과가 항상 같은 최종 상태로 수렴합니다. 이미 존재하는 리소스는 다시 만들지 않고, 변경이 필요한 부분만 갱신합니다.
+
+> **참고:** Terraform은 **선언형(declarative)** 도구입니다. "서브넷을 만들고, 그 다음 라우트 테이블을 연결하라"처럼 절차를 명시하는 대신, "이런 VPC, 이런 서브넷이 있어야 한다"고 선언하면 Terraform이 순서와 의존성을 스스로 계산합니다.
 
 > **왜 분리하는가?**  
 > HashiCorp는 Terraform 상태 파일의 관리 범위를 가능한 한 작게 유지할 것을 권장합니다. 하나의 상태 파일에 모든 리소스를 넣으면, 단일 리소스 변경이 전체 인프라에 영향을 줄 수 있기 때문입니다.  
@@ -566,7 +621,7 @@ infra/
 - 모듈 수정 시 모든 환경에 일관되게 반영
 - 환경별 상태 파일이 분리되어 blast radius 최소화
 
-### 6.1 전체 프로젝트 구조
+### 6.2 전체 프로젝트 구조
 
 ```
 ~/workshop-iac/
@@ -588,7 +643,7 @@ infra/
 └── README.md
 ```
 
-### 6.2 아키텍처 설계 원칙
+### 6.3 아키텍처 설계 원칙
 
 컨테이너 워크로드에 최적화된 VPC는 아래 AWS 모범 사례를 따릅니다.
 
@@ -602,7 +657,7 @@ infra/
 
 > 참고: [AWS VPC 보안 모범 사례](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-best-practices.html), [Amazon ECS 서비스 연결 모범 사례](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/networking-connecting-services.html)
 
-### 6.3 인프라 템플릿에 포함되는 리소스
+### 6.4 인프라 템플릿에 포함되는 리소스
 
 인프라 템플릿은 네트워크와 클러스터 등 기반 리소스를 관리합니다.
 
@@ -613,7 +668,7 @@ infra/
 | ECS Cluster | Fargate 태스크 실행 환경 |
 | VPC 엔드포인트 | ECR, S3, CloudWatch Logs 프라이빗 접근 |
 
-### 6.4 Claude Code로 인프라 모듈 생성
+### 6.5 Claude Code로 인프라 모듈 생성
 
 > **Challenge:** 아래의 코드를 그대로 실행해도 좋습니다. 하지만 Well-Architected Framework 관점에서 개선해야 할 부분이 있지 않을까요? 한번 생각해보시고 프롬프트를 수정해서 요청해보세요.
 
@@ -646,7 +701,7 @@ claude "infra/ 디렉토리에 컨테이너 워크로드 기반 인프라 Terraf
 - Terraform AWS provider 모범 사례 적용"
 ```
 
-### 6.5 생성될 파일 구조
+### 6.6 생성될 파일 구조
 
 ```
 infra/
@@ -670,7 +725,7 @@ infra/
 └── README.md
 ```
 
-### 6.6 예제 코드 — VPC 모듈
+### 6.7 예제 코드 — VPC 모듈
 
 Claude Code가 생성하는 코드의 예시입니다. 실제로는 프롬프트에 따라 코드가 달라질 수 있습니다.
 
@@ -696,7 +751,7 @@ variable "vpc_cidr" {
 variable "availability_zones" {
   description = "사용할 가용 영역 목록"
   type        = list(string)
-  default     = ["us-east-1a", "us-east-1b"]
+  default     = ["us-west-2a", "us-west-2b"]
 }
 
 variable "public_subnet_cidrs" {
@@ -837,6 +892,7 @@ resource "aws_route_table_association" "private" {
 
 ```hcl
 # ECR API 엔드포인트 — 컨테이너 이미지 메타데이터 조회를 VPC 내부에서 처리
+# Interface 엔드포인트는 아래 S3 Gateway 엔드포인트와 달리 시간당 요금 + 데이터 처리 요금이 발생합니다.
 resource "aws_vpc_endpoint" "ecr_api" {
   vpc_id              = aws_vpc.this.id
   service_name        = "com.amazonaws.${data.aws_region.current.name}.ecr.api"
@@ -935,7 +991,7 @@ output "vpc_cidr_block" {
 }
 ```
 
-### 6.7 예제 코드 — ECS Cluster 모듈
+### 6.8 예제 코드 — ECS Cluster 모듈
 
 **infra/modules/ecs-cluster/main.tf**
 
@@ -944,7 +1000,7 @@ output "vpc_cidr_block" {
 resource "aws_ecs_cluster" "this" {
   name = "${var.project_name}-${var.environment}-cluster"
 
-  # Container Insights — CPU/메모리/네트워크 메트릭 수집 활성화
+  # Container Insights — CPU/메모리/네트워크 메트릭 수집 활성화 (표준 CloudWatch 요금보다 추가 비용 발생)
   setting {
     name  = "containerInsights"
     value = "enabled"
@@ -961,6 +1017,8 @@ resource "aws_ecs_cluster_capacity_providers" "this" {
   capacity_providers = ["FARGATE", "FARGATE_SPOT"]
 
   # 기본 전략: FARGATE를 기본으로 사용, base=1은 최소 1개 태스크를 FARGATE로 실행
+  # 이 기본 전략만으로는 FARGATE_SPOT이 실제로 쓰이지 않습니다 — 서비스별로
+  # capacity_provider_strategy를 개별 지정해야 Spot 비중을 반영할 수 있습니다(7.6절 참고).
   default_capacity_provider_strategy {
     capacity_provider = "FARGATE"
     weight            = 1
@@ -969,7 +1027,7 @@ resource "aws_ecs_cluster_capacity_providers" "this" {
 }
 ```
 
-### 6.8 예제 코드 — 환경 구성 (dev)
+### 6.9 예제 코드 — 환경 구성 (dev)
 
 **infra/environments/dev/providers.tf**
 
@@ -984,7 +1042,8 @@ terraform {
     }
   }
 
-  # 워크샵용 로컬 백엔드
+  # 워크샵용 로컬 백엔드 — 상태 잠금이 없고 팀원 간 공유가 불가능합니다.
+  # 실무에서는 S3(+ DynamoDB 잠금) 등 원격 백엔드를 사용하세요.
   backend "local" {
     path = "terraform.tfstate"
   }
@@ -1062,12 +1121,12 @@ output "ecs_cluster_name" {
 ```hcl
 project_name       = "workshop"
 environment        = "dev"
-aws_region         = "us-east-1"
+aws_region         = "us-west-2"
 vpc_cidr           = "10.0.0.0/16"
-availability_zones = ["us-east-1a", "us-east-1b"]
+availability_zones = ["us-west-2a", "us-west-2b"]
 ```
 
-### 6.9 Terraform 배포
+### 6.10 Terraform 배포
 
 ```bash
 cd infra/environments/dev
@@ -1082,7 +1141,7 @@ terraform plan
 terraform apply
 ```
 
-### 6.10 배포 결과 확인 및 출력값 기록
+### 6.11 배포 결과 확인 및 출력값 기록
 
 ```bash
 # 출력값 확인 — app 템플릿에서 참조할 값들
@@ -1092,7 +1151,7 @@ terraform output
 출력 예시:
 
 ```
-ecs_cluster_id = "arn:aws:ecs:us-east-1:123456789012:cluster/workshop-cluster"
+ecs_cluster_id = "arn:aws:ecs:us-west-2:123456789012:cluster/workshop-cluster"
 ecs_cluster_name = "workshop-dev-cluster"
 private_subnet_ids = ["subnet-0aaa...", "subnet-0bbb..."]
 public_subnet_ids = ["subnet-0ccc...", "subnet-0ddd..."]
@@ -1105,7 +1164,7 @@ claude "방금 배포한 인프라의 리소스 상태를 확인하고,
 보안 관점에서 개선할 점이 있는지 분석해줘"
 ```
 
-### 6.11 아키텍처 다이어그램 생성 — 인프라
+### 6.12 아키텍처 다이어그램 생성 — 인프라
 
 > **Challenge:** 방금 전 Terraform으로 생성한 인프라 아키텍처를 mermaid 다이어그램으로 변환하고 이미지를 생성해주세요.
 >
@@ -1197,7 +1256,7 @@ for repo in workshop-cats workshop-dogs workshop-web; do
   aws ecr create-repository \
     --repository-name $repo \
     --image-scanning-configuration scanOnPush=true \
-    --region us-east-1
+    --region us-west-2
 done
 ```
 
@@ -1206,14 +1265,14 @@ done
 ```bash
 # ECR 로그인
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-aws ecr get-login-password --region us-east-1 | \
-  docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password --region us-west-2 | \
+  docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com
 
 # Cats 이미지 빌드 & 푸시
 cd ecs-cats-dogs/cats
 docker build -t workshop-cats .
-docker tag workshop-cats:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/workshop-cats:latest
-docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/workshop-cats:latest
+docker tag workshop-cats:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/workshop-cats:latest
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/workshop-cats:latest
 ```
 
 > **Challenge:** 이제 dogs 서비스와 web (Homepage) 서비스를 위한 Docker 이미지를 빌드하고 푸시해주세요.
@@ -1224,7 +1283,7 @@ docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/workshop-cats:late
 > **팁:** 위 과정을 Claude Code에게 한 번에 맡길 수도 있습니다:
 > ```bash
 > claude "ecs-cats-dogs 디렉토리의 cats, dogs, web 각각을 Docker 빌드해서 
-> ECR에 푸시하는 스크립트를 작성하고 실행해줘. 리전은 us-east-1이야."
+> ECR에 푸시하는 스크립트를 작성하고 실행해줘. 리전은 us-west-2야."
 > ```
 
 #### 7.2.4 푸시 결과 확인
@@ -1238,9 +1297,9 @@ done
 ```
 
 이후 Terraform ECS Task Definition에서 이 ECR 이미지 URI를 참조합니다:
-- `${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/workshop-cats:latest`
-- `${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/workshop-dogs:latest`
-- `${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/workshop-web:latest`
+- `${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/workshop-cats:latest`
+- `${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/workshop-dogs:latest`
+- `${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/workshop-web:latest`
 
 ### 7.3 인프라 출력값 참조 방식
 
@@ -1248,6 +1307,8 @@ done
 
 ```hcl
 # app/environments/dev/data.tf
+# 로컬 백엔드의 tfstate 파일을 상대 경로로 직접 읽으므로, 인프라를 적용한 것과
+# 동일한 머신에서만 동작합니다(팀원 간 공유 불가).
 data "terraform_remote_state" "infra" {
   backend = "local"
   config = {
@@ -1784,6 +1845,8 @@ output "security_group_id" {
 ```hcl
 # 인프라 템플릿의 상태 파일에서 출력값 참조
 # 인프라(VPC, ECS Cluster)가 먼저 배포되어 있어야 함
+# 로컬 백엔드의 tfstate 파일을 상대 경로로 직접 읽으므로, 인프라를 적용한 것과
+# 동일한 머신에서만 동작합니다(팀원 간 공유 불가). 원격 백엔드로 바꾸면 이 블록도 함께 수정하세요.
 data "terraform_remote_state" "infra" {
   backend = "local"
   config = {
@@ -1802,7 +1865,10 @@ module "cats" {
   service_name          = "cats"
   project_name          = var.project_name
   environment           = var.environment
-  container_image       = "${var.aws_account_id}.dkr.ecr.us-east-1.amazonaws.com/workshop-cats:latest"
+  # ":latest" 고정 태그 — ECR에 새 이미지를 푸시해도 이 문자열 자체는 바뀌지 않아
+  # Terraform이 변경을 감지하지 못합니다. 새 이미지 배포는
+  # `aws ecs update-service --force-new-deployment`로 별도 실행해야 합니다.
+  container_image       = "${var.aws_account_id}.dkr.ecr.us-west-2.amazonaws.com/workshop-cats:latest"
   container_port        = 80
   cpu                   = 256                  # 0.25 vCPU
   memory                = 512                  # 512 MB
@@ -1826,7 +1892,7 @@ module "dogs" {
   service_name          = "dogs"
   project_name          = var.project_name
   environment           = var.environment
-  container_image       = "${var.aws_account_id}.dkr.ecr.us-east-1.amazonaws.com/workshop-dogs:latest"
+  container_image       = "${var.aws_account_id}.dkr.ecr.us-west-2.amazonaws.com/workshop-dogs:latest"
   container_port        = 80
   cpu                   = 256
   memory                = 512
@@ -1850,7 +1916,7 @@ module "web" {
   service_name          = "web"
   project_name          = var.project_name
   environment           = var.environment
-  container_image       = "${var.aws_account_id}.dkr.ecr.us-east-1.amazonaws.com/workshop-web:latest"
+  container_image       = "${var.aws_account_id}.dkr.ecr.us-west-2.amazonaws.com/workshop-web:latest"
   container_port        = 80
   cpu                   = 256
   memory                = 512
@@ -1889,6 +1955,8 @@ terraform {
     }
   }
 
+  # 워크샵용 로컬 백엔드 — infra/environments/dev도 로컬 백엔드이므로,
+  # data.tf의 terraform_remote_state가 동작하려면 인프라를 동일 머신에서 먼저 적용해야 합니다.
   backend "local" {
     path = "terraform.tfstate"
   }
@@ -1932,7 +2000,7 @@ output "alb_dns_name" {
 ```hcl
 project_name = "workshop"
 environment  = "dev"
-aws_region   = "us-east-1"
+aws_region   = "us-west-2"
 ```
 
 ### 7.8 핵심 구성 패턴 — 모듈 재사용
@@ -2078,7 +2146,7 @@ terraform destroy
 > ```bash
 > # ECR을 CLI로 생성한 경우에만 실행
 > for repo in workshop-cats workshop-dogs workshop-web; do
->   aws ecr delete-repository --repository-name $repo --force --region us-east-1
+>   aws ecr delete-repository --repository-name $repo --force --region us-west-2
 > done
 > ```
 
