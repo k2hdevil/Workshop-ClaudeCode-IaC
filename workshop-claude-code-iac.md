@@ -113,6 +113,8 @@ claude
 
 워크샵에서 제공하는 AWS 자격 증명을 환경 변수로 설정합니다.
 
+> AWS 주최 워크샵인 경우 워크샵 페이지 왼쪽의 **Get AWS CLI Credentials**에서 자격 증명을 확인할 수 있으며, 운영체제에 맞게 진행하시면 됩니다.
+
 ```bash
 export AWS_ACCESS_KEY_ID="<워크샵에서 제공된 값>"
 export AWS_SECRET_ACCESS_KEY="<워크샵에서 제공된 값>"
