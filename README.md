@@ -30,12 +30,15 @@ AI 에이전틱 코딩 도구인 Claude Code와 Amazon Bedrock을 활용하여, 
 - Amazon Bedrock 기반 AI 에이전트 환경 구성 방법
 - SKILL.md를 통한 AI 에이전트 커스터마이징 기법
 - MCP 프로토콜을 활용한 외부 도구 연동 (Terraform Registry, AWS 서비스)
+- Terraform의 핵심 개념(Provider, State, Plan/Apply, Module, HCL) 이해
 - Terraform 모듈 설계 모범 사례 (인프라/애플리케이션 분리, DRY 원칙)
 - ECS Fargate 기반 멀티 서비스 아키텍처 설계 및 배포
 - ALB 경로 기반 라우팅과 Step Scaling Auto Scaling 구성
 - AI를 활용한 인프라 비용 분석 및 아키텍처 개선 프로세스
 
 ## 워크샵 실습 목차
+
+> **실습 방법:** [`workshop-claude-code-iac.md`](workshop-claude-code-iac.md) 파일을 열어, 아래 목차 순서에 맞춰 각 단계의 본문·명령어·예제 코드를 그대로 따라 진행하세요.
 
 | 단계 | 실습 내용 | 설명 |
 |------|-----------|------|
@@ -61,7 +64,8 @@ AI 에이전틱 코딩 도구인 Claude Code와 Amazon Bedrock을 활용하여, 
 | Terraform 코드 구조 모범 사례 | https://docs.aws.amazon.com/prescriptive-guidance/latest/terraform-aws-provider-best-practices/structure.html |
 | Amazon ECS 모범 사례 | https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/intro.html |
 | AWS VPC 보안 모범 사례 | https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-best-practices.html |
-| HashiCorp Terraform MCP Server | https://github.com/hashicorp/terraform-mcp-server |
+| HashiCorp Terraform MCP Server (공식, 컨테이너 이미지) | https://github.com/hashicorp/terraform-mcp-server |
+| Terraform MCP Server (서드파티, npx 패키지) | https://github.com/thrashr888/terraform-mcp-server |
 | AWS MCP Servers | https://awslabs.github.io/mcp/ |
 | ECS Cats & Dogs 샘플 앱 | https://github.com/solminkim/ecs-cats-dogs |
 
