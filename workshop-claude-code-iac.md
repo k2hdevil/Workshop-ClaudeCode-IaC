@@ -75,9 +75,39 @@ Claude Code는 Anthropic이 개발한 **에이전틱(agentic) 코딩 도구**입
 | Node.js | 18 이상 |
 | 운영체제 | macOS, Linux, 또는 Windows(WSL2) |
 | 터미널 | bash 또는 zsh |
+| AWS CLI | v2 (2장 인증 구성에서 사용) |
+| Terraform CLI | 1.5 이상 (6장부터 사용) |
 
 > **Windows 사용자:** WSL2가 설치되어 있어야 합니다. 모든 명령은 WSL2 터미널 내에서 실행합니다.  
 > 설치 가이드: https://learn.microsoft.com/ko-kr/windows/wsl/install
+
+> **AWS CLI 설치** (미설치 시):
+> ```bash
+> # macOS
+> brew install awscli
+>
+> # Linux
+> curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && unzip awscliv2.zip && sudo ./aws/install
+>
+> # Windows(WSL2) — Linux 안내와 동일
+>
+> aws --version  # 설치 확인
+> ```
+> 공식 가이드: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+
+> **Terraform CLI 설치** (미설치 시):
+> ```bash
+> # macOS
+> brew tap hashicorp/tap && brew install hashicorp/tap/terraform
+>
+> # Linux(Ubuntu/Debian, WSL2 포함)
+> wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+> echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+> sudo apt update && sudo apt install terraform
+>
+> terraform --version  # 설치 확인
+> ```
+> 공식 가이드: https://developer.hashicorp.com/terraform/install
 
 ### 1.3 설치
 
