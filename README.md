@@ -1,3 +1,5 @@
+[English](README.en.md) | **한국어**
+
 # Claude Code를 활용한 AWS 인프라 관리 및 코드형 인프라(IaC) 워크샵
 
 ## 워크샵 개요

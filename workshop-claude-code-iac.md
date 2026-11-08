@@ -1,3 +1,5 @@
+[English](workshop-claude-code-iac.en.md) | **한국어**
+
 # Claude Code를 활용한 AWS 인프라 관리 및 코드형 인프라(IaC) 워크샵
 
 > **소요 시간:** 약 3시간  
@@ -11,7 +13,7 @@
 >
 > - 섹션 2.1: `export AWS_REGION="us-east-1"`
 > - 섹션 3.1: settings.json의 `"AWS_REGION": "us-east-1"`
-> - 섹션 6.9: terraform.tfvars의 `aws_region = "us-east-1"`, `availability_zones = ["us-east-1a", "us-east-1b"]`
+> - 섹션 6.9: terraform.tfvars의 `aws_region = "us-east-1"` (가용 영역은 리전에서 자동으로 선택되므로 따로 바꿀 필요가 없습니다)
 > - 섹션 7.2: ECR 명령어의 `--region us-east-1` 및 ECR URI의 `.ecr.us-east-1.amazonaws.com`
 > - 섹션 7.7: app terraform.tfvars의 `aws_region = "us-east-1"`
 >
@@ -429,9 +431,10 @@ description: AWS ECS Fargate 인프라를 Terraform으로 관리하기 위한 Sk
 ## AWS 아키텍처 규칙
 
 ### 네트워크
-- VPC는 최소 2개 AZ에 걸쳐 서브넷을 구성
-- 퍼블릭 서브넷: ALB 배치
-- 프라이빗 서브넷: ECS 태스크 배치
+- VPC는 3개 AZ에 걸쳐 frontend / backend / database 3티어 서브넷을 구성
+- frontend (퍼블릭 서브넷): ALB, NAT Gateway 배치
+- backend (프라이빗 서브넷): ECS 태스크 배치
+- database (프라이빗 서브넷): 데이터베이스용으로 분리
 - NAT Gateway를 통한 아웃바운드 통신
 
 ### 컨테이너
@@ -681,11 +684,11 @@ infra/
 
 | 원칙 | 설명 |
 |------|------|
-| 다중 AZ 배치 | 최소 2개 가용 영역에 서브넷을 분산하여 고가용성 확보 |
-| 퍼블릭/프라이빗 서브넷 분리 | ALB는 퍼블릭, ECS 태스크는 프라이빗 서브넷에 배치 |
+| 다중 AZ 배치 | 3개 가용 영역에 서브넷을 분산하여 고가용성 확보 |
+| 3티어 서브넷 분리 | frontend(퍼블릭)에는 ALB·NAT Gateway, backend(프라이빗)에는 ECS 태스크, database(프라이빗)는 데이터베이스용으로 분리 |
 | NAT Gateway | 프라이빗 서브넷의 아웃바운드 인터넷 통신 지원 |
 | VPC 엔드포인트 | ECR, S3, CloudWatch Logs 등 AWS 서비스에 프라이빗 접근 |
-| 적정 CIDR 설계 | 향후 확장을 고려한 IP 주소 공간 할당 |
+| 적정 CIDR 설계 | `/16` VPC를 `/20` 서브넷 9개(3티어 × 3 AZ)로 분할하여 향후 확장 여지 확보 |
 
 > 참고: [AWS VPC 보안 모범 사례](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-best-practices.html), [Amazon ECS 서비스 연결 모범 사례](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/networking-connecting-services.html)
 
@@ -695,7 +698,7 @@ infra/
 
 | 리소스 | 역할 |
 |--------|------|
-| VPC + 서브넷 | 네트워크 격리 및 가용 영역 분산 |
+| VPC + 서브넷 9개 | 네트워크 격리 및 가용 영역 분산 (frontend / backend / database × 3 AZ) |
 | Internet Gateway + NAT Gateway | 인터넷 통신 |
 | ECS Cluster | Fargate 태스크 실행 환경 |
 | VPC 엔드포인트 | ECR, S3, CloudWatch Logs 프라이빗 접근 |
@@ -712,10 +715,14 @@ claude "infra/ 디렉토리에 컨테이너 워크로드 기반 인프라 Terraf
 
 요구사항:
 - infra/modules/vpc/ — VPC 모듈
-  - 2개 AZ에 퍼블릭/프라이빗 서브넷 배치
+  - 3개 AZ(az_count 변수, 기본값 3)에 3티어 서브넷 배치
+    - frontend (퍼블릭): ALB, NAT Gateway
+    - backend (프라이빗): ECS 태스크
+    - database (프라이빗): 데이터베이스용 (이 워크샵에서는 비어 있음)
+  - VPC CIDR 기본값 10.0.0.0/16을 cidrsubnet()으로 /20 서브넷 9개로 분할
   - NAT Gateway (단일 — 워크샵 비용 절감)
-  - VPC 엔드포인트 (ECR API, ECR DKR, S3, CloudWatch Logs)
-  - CIDR 기본값 10.0.0.0/16
+  - VPC 엔드포인트 (S3 Gateway, ECR API, ECR DKR, CloudWatch Logs)
+    — Interface 엔드포인트는 backend 서브넷에 배치
 
 - infra/modules/ecs-cluster/ — ECS Cluster 모듈
   - Fargate 용량 공급자 설정
@@ -727,7 +734,8 @@ claude "infra/ 디렉토리에 컨테이너 워크로드 기반 인프라 Terraf
   - backend는 local (워크샵용)
   - provider 버전 고정 (~> 5.0)
   - outputs.tf에 app 템플릿이 참조할 값들 출력
-    (vpc_id, public_subnet_ids, private_subnet_ids, ecs_cluster_id)
+    (vpc_id, public_subnet_ids(=frontend), private_subnet_ids(=backend),
+     database_subnet_ids, ecs_cluster_id, ecs_cluster_name)
 
 - 공통 태그: Project=workshop, Environment=dev, ManagedBy=terraform
 - Terraform AWS provider 모범 사례 적용"
@@ -744,7 +752,7 @@ infra/
 │   │   ├── variables.tf      # 입력 변수 (CIDR, AZ 등)
 │   │   └── outputs.tf        # 출력 값 (vpc_id, subnet_ids 등)
 │   └── ecs-cluster/
-│       ├── main.tf           # ECS Cluster, Fargate 용량 공급자
+│       ├── main.tf           # ECS Cluster, Fargate 용량 공급자, CloudWatch Log Group
 │       ├── variables.tf      # 입력 변수
 │       └── outputs.tf        # 출력 값 (cluster_id, cluster_name)
 ├── environments/
@@ -761,16 +769,19 @@ infra/
 
 Claude Code가 생성하는 코드의 예시입니다. 실제로는 프롬프트에 따라 코드가 달라질 수 있습니다.
 
+이 VPC 모듈은 `/16` VPC를 `cidrsubnet()`으로 `/20` 서브넷 9개(3티어 × 3 AZ)로 나눕니다.
+
+| 티어 | 서브넷 유형 | CIDR (AZ-a / AZ-b / AZ-c) | 용도 |
+|------|------------|---------------------------|------|
+| frontend | 퍼블릭 | `10.0.0.0/20`, `10.0.16.0/20`, `10.0.32.0/20` | ALB, NAT Gateway |
+| backend | 프라이빗 | `10.0.64.0/20`, `10.0.80.0/20`, `10.0.96.0/20` | ECS 태스크, Interface VPC 엔드포인트 |
+| database | 프라이빗 | `10.0.128.0/20`, `10.0.144.0/20`, `10.0.160.0/20` | 데이터베이스용 (이 워크샵에서는 사용하지 않음) |
+
 **infra/modules/vpc/variables.tf**
 
 ```hcl
-variable "project_name" {
-  description = "프로젝트 이름"
-  type        = string
-}
-
-variable "environment" {
-  description = "환경 (dev, staging, prod)"
+variable "name" {
+  description = "모든 VPC 리소스 이름의 접두사"
   type        = string
 }
 
@@ -780,22 +791,10 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
-variable "availability_zones" {
-  description = "사용할 가용 영역 목록"
-  type        = list(string)
-  default     = ["us-west-2a", "us-west-2b"]
-}
-
-variable "public_subnet_cidrs" {
-  description = "퍼블릭 서브넷 CIDR 목록"
-  type        = list(string)
-  default     = ["10.0.1.0/24", "10.0.2.0/24"]
-}
-
-variable "private_subnet_cidrs" {
-  description = "프라이빗 서브넷 CIDR 목록"
-  type        = list(string)
-  default     = ["10.0.10.0/24", "10.0.20.0/24"]
+variable "az_count" {
+  description = "사용할 가용 영역(AZ) 수"
+  type        = number
+  default     = 3
 }
 
 variable "tags" {
@@ -808,50 +807,77 @@ variable "tags" {
 **infra/modules/vpc/main.tf**
 
 ```hcl
+# 현재 리전에서 사용 가능한 AZ 목록 — 리전이 바뀌어도 AZ 이름을 직접 적을 필요가 없습니다
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+locals {
+  az_names = slice(data.aws_availability_zones.available.names, 0, var.az_count)
+
+  # VPC CIDR(/16)을 /20 서브넷으로 분할: 3티어 × 3 AZ = 9개 (서브넷당 IP 4,096개)
+  # cidrsubnet(CIDR, 4, n) → n번째 /20 블록. 티어별로 시작 번호를 달리해 대역을 분리합니다.
+  frontend_cidrs = [for i, az in local.az_names : cidrsubnet(var.vpc_cidr, 4, i)]      # 0, 1, 2
+  backend_cidrs  = [for i, az in local.az_names : cidrsubnet(var.vpc_cidr, 4, i + 4)]  # 4, 5, 6
+  database_cidrs = [for i, az in local.az_names : cidrsubnet(var.vpc_cidr, 4, i + 8)]  # 8, 9, 10
+}
+
 # VPC 생성 — 컨테이너 워크로드를 위한 격리된 네트워크
 resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true  # ECS 서비스 디스커버리에 필요
   enable_dns_support   = true  # VPC 내부 DNS 확인 활성화
 
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-vpc"
-  })
-}
-
-# 퍼블릭 서브넷 — ALB가 배치될 인터넷 접근 가능 서브넷
-resource "aws_subnet" "public" {
-  count                   = length(var.public_subnet_cidrs)
-  vpc_id                  = aws_vpc.this.id
-  cidr_block              = var.public_subnet_cidrs[count.index]
-  availability_zone       = var.availability_zones[count.index]
-  map_public_ip_on_launch = true  # 퍼블릭 IP 자동 할당
-
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-public-${count.index + 1}"
-    Tier = "Public"
-  })
-}
-
-# 프라이빗 서브넷 — ECS 태스크가 배치될 인터넷 비노출 서브넷
-resource "aws_subnet" "private" {
-  count             = length(var.private_subnet_cidrs)
-  vpc_id            = aws_vpc.this.id
-  cidr_block        = var.private_subnet_cidrs[count.index]
-  availability_zone = var.availability_zones[count.index]
-
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-private-${count.index + 1}"
-    Tier = "Private"
-  })
+  tags = merge(var.tags, { Name = var.name })
 }
 
 # Internet Gateway — VPC의 인터넷 연결 게이트웨이
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
+  tags = merge(var.tags, { Name = "${var.name}-igw" })
+}
+
+# frontend 서브넷(퍼블릭) — ALB와 NAT Gateway가 배치되는 인터넷 접근 가능 서브넷
+resource "aws_subnet" "frontend" {
+  count = var.az_count
+
+  vpc_id                  = aws_vpc.this.id
+  cidr_block              = local.frontend_cidrs[count.index]
+  availability_zone       = local.az_names[count.index]
+  map_public_ip_on_launch = true  # 퍼블릭 IP 자동 할당
+
   tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-igw"
+    Name = "${var.name}-frontend-${local.az_names[count.index]}"
+    Tier = "frontend"
+  })
+}
+
+# backend 서브넷(프라이빗) — ECS 태스크가 배치되는 인터넷 비노출 서브넷
+resource "aws_subnet" "backend" {
+  count = var.az_count
+
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = local.backend_cidrs[count.index]
+  availability_zone = local.az_names[count.index]
+
+  tags = merge(var.tags, {
+    Name = "${var.name}-backend-${local.az_names[count.index]}"
+    Tier = "backend"
+  })
+}
+
+# database 서브넷(프라이빗) — 데이터베이스용으로 분리해 둔 서브넷 (이 워크샵에서는 비어 있음)
+resource "aws_subnet" "database" {
+  count = var.az_count
+
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = local.database_cidrs[count.index]
+  availability_zone = local.az_names[count.index]
+
+  tags = merge(var.tags, {
+    Name = "${var.name}-database-${local.az_names[count.index]}"
+    Tier = "database"
   })
 }
 
@@ -859,63 +885,67 @@ resource "aws_internet_gateway" "this" {
 resource "aws_eip" "nat" {
   domain = "vpc"
 
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-nat-eip"
-  })
+  tags       = merge(var.tags, { Name = "${var.name}-nat-eip" })
+  depends_on = [aws_internet_gateway.this]
 }
 
 # NAT Gateway (단일) — 프라이빗 서브넷의 아웃바운드 인터넷 통신 담당
-# 프로덕션에서는 AZ당 1개씩 배치하여 고가용성 확보 권장
+# 비용 절감을 위해 1개만 배치합니다(시간당 요금 + 데이터 처리 요금 발생).
+# 해당 AZ 장애 시 모든 프라이빗 서브넷의 아웃바운드 통신이 끊깁니다.
+# 프로덕션에서는 AZ당 1개씩 배치하여 고가용성을 확보하세요.
 resource "aws_nat_gateway" "this" {
   allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id  # 첫 번째 퍼블릭 서브넷에 배치
+  subnet_id     = aws_subnet.frontend[0].id  # 첫 번째 frontend 서브넷에 배치
 
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-nat"
-  })
-
+  tags       = merge(var.tags, { Name = "${var.name}-nat" })
   depends_on = [aws_internet_gateway.this]  # IGW 생성 후 NAT 생성
 }
 
-# 퍼블릭 라우트 테이블 — 인터넷 트래픽을 IGW로 라우팅
-resource "aws_route_table" "public" {
+# frontend 라우트 테이블 — 인터넷 트래픽을 IGW로 라우팅
+resource "aws_route_table" "frontend" {
   vpc_id = aws_vpc.this.id
 
   route {
-    cidr_block = "0.0.0.0/0"          # 모든 외부 트래픽
+    cidr_block = "0.0.0.0/0"                   # 모든 외부 트래픽
     gateway_id = aws_internet_gateway.this.id  # IGW로 전달
   }
 
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-public-rt"
-  })
+  tags = merge(var.tags, { Name = "${var.name}-frontend-rt" })
 }
 
-# 퍼블릭 서브넷과 라우트 테이블 연결
-resource "aws_route_table_association" "public" {
-  count          = length(aws_subnet.public)
-  subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public.id
+resource "aws_route_table_association" "frontend" {
+  count = var.az_count
+
+  subnet_id      = aws_subnet.frontend[count.index].id
+  route_table_id = aws_route_table.frontend.id
 }
 
 # 프라이빗 라우트 테이블 — 외부 트래픽을 NAT Gateway로 라우팅
+# backend와 database 서브넷이 이 라우트 테이블을 공유합니다.
+# 즉 database 티어도 NAT Gateway를 통해 인터넷 아웃바운드가 가능합니다.
+# 데이터베이스를 완전히 격리하려면 별도 라우트 테이블(라우트 없음)을 분리하세요.
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
 
   route {
-    cidr_block     = "0.0.0.0/0"           # 모든 외부 트래픽
-    nat_gateway_id = aws_nat_gateway.this.id  # NAT GW로 전달
+    cidr_block     = "0.0.0.0/0"               # 모든 외부 트래픽
+    nat_gateway_id = aws_nat_gateway.this.id   # NAT GW로 전달
   }
 
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-private-rt"
-  })
+  tags = merge(var.tags, { Name = "${var.name}-private-rt" })
 }
 
-# 프라이빗 서브넷과 라우트 테이블 연결
-resource "aws_route_table_association" "private" {
-  count          = length(aws_subnet.private)
-  subnet_id      = aws_subnet.private[count.index].id
+resource "aws_route_table_association" "backend" {
+  count = var.az_count
+
+  subnet_id      = aws_subnet.backend[count.index].id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "database" {
+  count = var.az_count
+
+  subnet_id      = aws_subnet.database[count.index].id
   route_table_id = aws_route_table.private.id
 }
 ```
@@ -923,64 +953,10 @@ resource "aws_route_table_association" "private" {
 **infra/modules/vpc/endpoints.tf**
 
 ```hcl
-# ECR API 엔드포인트 — 컨테이너 이미지 메타데이터 조회를 VPC 내부에서 처리
-# Interface 엔드포인트는 아래 S3 Gateway 엔드포인트와 달리 시간당 요금 + 데이터 처리 요금이 발생합니다.
-resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id              = aws_vpc.this.id
-  service_name        = "com.amazonaws.${data.aws_region.current.name}.ecr.api"
-  vpc_endpoint_type   = "Interface"          # ENI 기반 프라이빗 연결
-  subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-  private_dns_enabled = true                 # 기존 DNS 이름으로 프라이빗 접근
-
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-ecr-api-endpoint"
-  })
-}
-
-# ECR DKR 엔드포인트 — 컨테이너 이미지 레이어 다운로드를 VPC 내부에서 처리
-resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id              = aws_vpc.this.id
-  service_name        = "com.amazonaws.${data.aws_region.current.name}.ecr.dkr"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-  private_dns_enabled = true
-
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-ecr-dkr-endpoint"
-  })
-}
-
-# S3 Gateway 엔드포인트 — ECR 이미지 레이어 저장소(S3) 접근, 무료
-resource "aws_vpc_endpoint" "s3" {
-  vpc_id            = aws_vpc.this.id
-  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
-  vpc_endpoint_type = "Gateway"              # 라우트 테이블 기반, 추가 비용 없음
-  route_table_ids   = [aws_route_table.private.id]
-
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-s3-endpoint"
-  })
-}
-
-# CloudWatch Logs 엔드포인트 — 컨테이너 로그 전송을 VPC 내부에서 처리
-resource "aws_vpc_endpoint" "logs" {
-  vpc_id              = aws_vpc.this.id
-  service_name        = "com.amazonaws.${data.aws_region.current.name}.logs"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-  private_dns_enabled = true
-
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-logs-endpoint"
-  })
-}
-
 # VPC 엔드포인트용 보안 그룹 — VPC 내부에서 HTTPS(443) 접근만 허용
 resource "aws_security_group" "vpc_endpoints" {
-  name_prefix = "${var.project_name}-${var.environment}-vpce-"
+  name        = "${var.name}-vpc-endpoints"
+  description = "Allow HTTPS from within the VPC for interface endpoints"
   vpc_id      = aws_vpc.this.id
 
   ingress {
@@ -990,9 +966,60 @@ resource "aws_security_group" "vpc_endpoints" {
     cidr_blocks = [var.vpc_cidr]  # VPC 내부 트래픽만 허용
   }
 
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-vpce-sg"
-  })
+  tags = merge(var.tags, { Name = "${var.name}-vpc-endpoints-sg" })
+}
+
+# S3 Gateway 엔드포인트 — ECR 이미지 레이어 저장소(S3) 접근, 무료
+# frontend와 private 라우트 테이블 양쪽에 연결합니다.
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  vpc_endpoint_type = "Gateway"  # 라우트 테이블 기반, 추가 비용 없음
+
+  route_table_ids = [
+    aws_route_table.frontend.id,
+    aws_route_table.private.id,
+  ]
+
+  tags = merge(var.tags, { Name = "${var.name}-s3-endpoint" })
+}
+
+# ECR API 엔드포인트 — 컨테이너 이미지 메타데이터 조회를 VPC 내부에서 처리
+# Interface 엔드포인트는 위의 S3 Gateway 엔드포인트와 달리 시간당 요금 + 데이터 처리 요금이 발생합니다.
+# 엔드포인트는 backend 서브넷마다 ENI가 하나씩 생성되므로, AZ 수가 늘면 요금도 함께 늘어납니다.
+resource "aws_vpc_endpoint" "ecr_api" {
+  vpc_id              = aws_vpc.this.id
+  service_name        = "com.amazonaws.${data.aws_region.current.name}.ecr.api"
+  vpc_endpoint_type   = "Interface"  # ENI 기반 프라이빗 연결
+  subnet_ids          = aws_subnet.backend[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true  # 기존 DNS 이름으로 프라이빗 접근
+
+  tags = merge(var.tags, { Name = "${var.name}-ecr-api-endpoint" })
+}
+
+# ECR DKR 엔드포인트 — 컨테이너 이미지 레이어 다운로드를 VPC 내부에서 처리
+resource "aws_vpc_endpoint" "ecr_dkr" {
+  vpc_id              = aws_vpc.this.id
+  service_name        = "com.amazonaws.${data.aws_region.current.name}.ecr.dkr"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.backend[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(var.tags, { Name = "${var.name}-ecr-dkr-endpoint" })
+}
+
+# CloudWatch Logs 엔드포인트 — 컨테이너 로그 전송을 VPC 내부에서 처리
+resource "aws_vpc_endpoint" "logs" {
+  vpc_id              = aws_vpc.this.id
+  service_name        = "com.amazonaws.${data.aws_region.current.name}.logs"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.backend[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(var.tags, { Name = "${var.name}-logs-endpoint" })
 }
 
 # 현재 리전 정보를 가져오기 위한 데이터 소스
@@ -1007,30 +1034,55 @@ output "vpc_id" {
   value       = aws_vpc.this.id
 }
 
-output "public_subnet_ids" {
-  description = "퍼블릭 서브넷 ID 목록"
-  value       = aws_subnet.public[*].id
-}
-
-output "private_subnet_ids" {
-  description = "프라이빗 서브넷 ID 목록"
-  value       = aws_subnet.private[*].id
-}
-
-output "vpc_cidr_block" {
+output "vpc_cidr" {
   description = "VPC CIDR 블록"
   value       = aws_vpc.this.cidr_block
+}
+
+output "frontend_subnet_ids" {
+  description = "frontend(퍼블릭) 서브넷 ID 목록"
+  value       = aws_subnet.frontend[*].id
+}
+
+output "backend_subnet_ids" {
+  description = "backend(프라이빗) 서브넷 ID 목록"
+  value       = aws_subnet.backend[*].id
+}
+
+output "database_subnet_ids" {
+  description = "database(프라이빗) 서브넷 ID 목록"
+  value       = aws_subnet.database[*].id
+}
+
+output "nat_gateway_id" {
+  description = "NAT Gateway ID"
+  value       = aws_nat_gateway.this.id
+}
+
+output "nat_gateway_public_ip" {
+  description = "NAT Gateway의 퍼블릭 IP"
+  value       = aws_eip.nat.public_ip
 }
 ```
 
 ### 6.8 예제 코드 — ECS Cluster 모듈
 
+이 모듈은 `name`, `log_retention_days`, `tags` 변수를 받고 `cluster_id`, `cluster_name`, `log_group_name` 등을 출력합니다.
+
 **infra/modules/ecs-cluster/main.tf**
 
 ```hcl
+# CloudWatch Log Group — ECS 클러스터 수준의 로그를 수집
+resource "aws_cloudwatch_log_group" "ecs" {
+  name              = "/ecs/${var.name}"
+  retention_in_days = var.log_retention_days
+
+  tags = merge(var.tags, { Name = "/ecs/${var.name}" })
+}
+
 # ECS 클러스터 — Fargate 태스크를 실행하는 논리적 그룹
 resource "aws_ecs_cluster" "this" {
-  name = "${var.project_name}-${var.environment}-cluster"
+  name = var.name
 
   # Container Insights — CPU/메모리/네트워크 메트릭 수집 활성화 (표준 CloudWatch 요금보다 추가 비용 발생)
   setting {
@@ -1038,9 +1090,7 @@ resource "aws_ecs_cluster" "this" {
     value = "enabled"
   }
 
-  tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-cluster"
-  })
+  tags = merge(var.tags, { Name = var.name })
 }
 
 # 용량 공급자 설정 — Fargate와 Fargate Spot을 모두 사용 가능하도록 구성
@@ -1094,28 +1144,69 @@ provider "aws" {
 }
 ```
 
+**infra/environments/dev/variables.tf**
+
+```hcl
+variable "aws_region" {
+  description = "리소스를 배포할 AWS 리전"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "project_name" {
+  description = "프로젝트 이름 (리소스 이름의 접두사)"
+  type        = string
+  default     = "workshop"
+}
+
+variable "environment" {
+  description = "환경 (dev, staging, prod)"
+  type        = string
+  default     = "dev"
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR 블록"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "az_count" {
+  description = "사용할 가용 영역(AZ) 수"
+  type        = number
+  default     = 3
+}
+
+variable "log_retention_days" {
+  description = "CloudWatch Log Group 보관 기간(일)"
+  type        = number
+  default     = 30
+}
+```
+
 **infra/environments/dev/main.tf**
 
 ```hcl
 module "vpc" {
   source = "../../modules/vpc"
 
-  project_name       = var.project_name
-  environment        = var.environment
-  vpc_cidr           = var.vpc_cidr
-  availability_zones = var.availability_zones
-  tags               = local.tags
+  name     = local.name
+  vpc_cidr = var.vpc_cidr
+  az_count = var.az_count
+  tags     = local.tags
 }
 
 module "ecs_cluster" {
   source = "../../modules/ecs-cluster"
 
-  project_name = var.project_name
-  environment  = var.environment
-  tags         = local.tags
+  name               = local.name
+  log_retention_days = var.log_retention_days
+  tags               = local.tags
 }
 
 locals {
+  name = "${var.project_name}-${var.environment}"  # 예: workshop-dev
+
   tags = {
     Project     = var.project_name
     Environment = var.environment
@@ -1131,12 +1222,19 @@ output "vpc_id" {
   value = module.vpc.vpc_id
 }
 
-output "private_subnet_ids" {
-  value = module.vpc.private_subnet_ids
+output "public_subnet_ids" {
+  description = "frontend(퍼블릭) 서브넷 — ALB 배치용"
+  value       = module.vpc.frontend_subnet_ids
 }
 
-output "public_subnet_ids" {
-  value = module.vpc.public_subnet_ids
+output "private_subnet_ids" {
+  description = "backend(프라이빗) 서브넷 — ECS 태스크 배치용"
+  value       = module.vpc.backend_subnet_ids
+}
+
+output "database_subnet_ids" {
+  description = "database(프라이빗) 서브넷"
+  value       = module.vpc.database_subnet_ids
 }
 
 output "ecs_cluster_id" {
@@ -1145,6 +1243,10 @@ output "ecs_cluster_id" {
 
 output "ecs_cluster_name" {
   value = module.ecs_cluster.cluster_name
+}
+
+output "ecs_log_group_name" {
+  value = module.ecs_cluster.log_group_name
 }
 ```
 
@@ -1155,7 +1257,8 @@ project_name       = "workshop"
 environment        = "dev"
 aws_region         = "us-west-2"
 vpc_cidr           = "10.0.0.0/16"
-availability_zones = ["us-west-2a", "us-west-2b"]
+az_count           = 3
+log_retention_days = 30
 ```
 
 ### 6.10 Terraform 배포
@@ -1183,10 +1286,12 @@ terraform output
 출력 예시:
 
 ```
-ecs_cluster_id = "arn:aws:ecs:us-west-2:123456789012:cluster/workshop-cluster"
-ecs_cluster_name = "workshop-dev-cluster"
-private_subnet_ids = ["subnet-0aaa...", "subnet-0bbb..."]
-public_subnet_ids = ["subnet-0ccc...", "subnet-0ddd..."]
+database_subnet_ids = ["subnet-0aaa...", "subnet-0bbb...", "subnet-0ccc..."]
+ecs_cluster_id = "arn:aws:ecs:us-west-2:123456789012:cluster/workshop-dev"
+ecs_cluster_name = "workshop-dev"
+ecs_log_group_name = "/ecs/workshop-dev"
+private_subnet_ids = ["subnet-0ddd...", "subnet-0eee...", "subnet-0fff..."]
+public_subnet_ids = ["subnet-0111...", "subnet-0222...", "subnet-0333..."]
 vpc_id = "vpc-0123..."
 ```
 
@@ -2095,8 +2200,8 @@ done
 
 # ECS 서비스 태스크 수 변화 확인
 aws ecs describe-services \
-  --cluster workshop-cluster \
-  --services cats \
+  --cluster workshop-dev \
+  --services workshop-dev-cats \
   --query "services[0].{desired:desiredCount,running:runningCount}"
 ```
 

@@ -4,10 +4,11 @@
 # 포함할 파일만 허용
 !.gitignore
 !README.md
+!README.en.md
 !workshop-claude-code-iac.md
+!workshop-claude-code-iac.en.md
 !assets/
 !assets/architecture.png
 !assets/app-architecture.png
 !assets/kiro-color.png
 !LICENSE
-!SKILL.md
